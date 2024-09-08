@@ -1,0 +1,55 @@
+// Add Custom Endpoint for Webhook
+add_action('rest_api_init', function () {
+    register_rest_route('custom_endpoint/v1', '/webhook', array(
+        'methods' => 'POST',
+        'callback' => 'handle_webhook',
+        'permission_callback' => '__return_true',
+    ));
+});
+
+function handle_webhook($request) { 
+    $params = $request->get_json_params(); 
+    $video_link = $params['webViewLink']; 
+    $first_name = sanitize_text_field($params['Name']); 
+
+    // Create a new WordPress page 
+    $permalink = create_custom_page($first_name, $video_link); 
+
+    return new WP_REST_Response(array(
+        'permalink' => $permalink,
+        'received_params' => $params // Added to inspect the payload
+    ), 200); 
+} 
+
+function create_custom_page($first_name, $video_link) { 
+    $post_data = array( 
+        'post_title'   => 'Hi, ' . $first_name . '!', 
+        'post_content' => '[custom_shortcode video_link="' . esc_url($video_link) . '" first_name="' . sanitize_text_field($first_name) . '"][raw_params]',
+        'post_status'  => 'draft', 
+        'post_type'    => 'page', 
+    ); 
+
+    // Insert the post into the database and get the post's permalink 
+    $post_id = wp_insert_post($post_data); 
+    $permalink = get_permalink($post_id); 
+
+    return $permalink; 
+}
+// Shortcode to render custom page content
+function custom_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'video_link' => '',
+        'first_name' => '',
+    ), $atts, 'custom_shortcode');
+
+    ob_start(); ?>
+
+    <h1>Hi, <?php echo esc_html($atts['first_name']); ?>!</h1>
+    <?php echo $atts['first_name']; ?>!</h1>
+
+    <p>This is your custom video page.</p>
+    <!-- <iframe src="<?php //echo esc_url($atts['video_link']); ?>" width="560" height="315" frameborder="0" allowfullscreen></iframe> -->
+
+    <?php return ob_get_clean();
+}
+add_shortcode('custom_shortcode', 'custom_shortcode');
